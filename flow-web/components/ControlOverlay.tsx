@@ -17,15 +17,15 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import {Slider} from "@/components/ui/slider";
-import React, {RefObject, useEffect, useState} from "react";
+import React, {useEffect, useState} from "react";
 import ParticleSystem from "@/simulation/ParticleSystem";
 import * as Three from 'three';
 
 type ControlOverlayProps = {
-    systemRef: RefObject<ParticleSystem | null>
+    system: ParticleSystem
 }
 
-export default function ControlOverlay({systemRef}: ControlOverlayProps) {
+export default function ControlOverlay({system}: ControlOverlayProps) {
     const [particleCount, setParticleCount] = useState<number>(0)
     const [attractors, setAttractors] = useState<Attractor[]>([])
 
@@ -37,40 +37,31 @@ export default function ControlOverlay({systemRef}: ControlOverlayProps) {
 
     const [newAttractorMode, setNewAttractorMode] = useState<string>("")
 
+    system.registerAttractorListener(attractors => setAttractors([...attractors]))
+
     // Sync the initial state of the system and controls
     useEffect(() => {
-        const system = systemRef.current
-        if (!system) return
-
         setParticleCount(system.particleCount)
         setAttractors(system.attractors)
 
-        system.registerAttractorListener(a => setAttractors([...a]))
-
         system.timeStep = integrationTimeStep[0]
         system.integrationSubsteps = integrationSubstepNumber[0]
-    }, [systemRef])
+    }, [system])
 
     useEffect(() => {
-        const system = systemRef.current
-        if (!system) return
-
         system.timeStep = integrationTimeStep[0] || initialIntegrationTimeStep
-    }, []);
+    }, [integrationTimeStep]);
 
     useEffect(() => {
-        const system = systemRef.current
-        if (!system) return
-
         system.integrationSubsteps = integrationSubstepNumber[0] || initialIntegrationSubstepNumber
     }, [integrationSubstepNumber]);
 
     function removeAttractor(index: number) {
-        systemRef.current && systemRef.current.removeAttractor(index)
+        system.removeAttractor(index)
     }
 
     function createAttractor(x: number, y: number, z: number, strength: number, mode: AttractorMode) {
-        systemRef.current && systemRef.current.addAttractor(new Attractor(
+        system.addAttractor(new Attractor(
             new Three.Vector3(x, y, z),
             strength,
             mode

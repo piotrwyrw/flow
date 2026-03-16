@@ -4,13 +4,11 @@ import React from "react";
 import CommandProcessor from "@/simulation/CommandProcessor";
 
 type CommandPromptProps = {
-    processor: CommandProcessor | null
+    processor: CommandProcessor
 }
 
 export default function CommandPrompt({processor}: CommandPromptProps) {
     const commandSubmit = (e: React.KeyboardEvent) => {
-        if (!processor) return
-
         if (e.key == 'Enter') {
             const inputElement = (e.target as HTMLInputElement)
             processor.handle(inputElement.value)

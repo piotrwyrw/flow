@@ -5,16 +5,19 @@ import useRenderer from "@/hooks/useRenderer";
 import ControlOverlay from "@/components/ControlOverlay";
 import CommandPrompt from "@/components/CommandPrompt";
 import CommandProcessor from "@/simulation/CommandProcessor";
+import ParticleSystem from "@/simulation/ParticleSystem";
 
 export default function Page() {
     const rendererRef = useRef<HTMLDivElement>(null)
-    const particleSystem = useRenderer(rendererRef)
+    const particleSystemRef = useRenderer(rendererRef)
 
     const [commandProcessor, setCommandProcessor] = useState<CommandProcessor | null>(null)
+    const [particleSystem, setParticleSystem] = useState<ParticleSystem | null>(null)
 
     useEffect(() => {
-        particleSystem.current && setCommandProcessor(new CommandProcessor(particleSystem.current))
-    }, [particleSystem]);
+        particleSystemRef.current && setCommandProcessor(new CommandProcessor(particleSystemRef.current))
+        particleSystemRef.current && setParticleSystem(particleSystemRef.current)
+    }, [particleSystemRef]);
 
     return (
         <>
@@ -22,9 +25,15 @@ export default function Page() {
                 <div ref={rendererRef} className="w-full h-full"></div>
             </div>
 
-            <ControlOverlay systemRef={particleSystem}></ControlOverlay>
+            {
+                particleSystem
+                && <ControlOverlay system={particleSystem}></ControlOverlay>
+            }
 
-            <CommandPrompt processor={commandProcessor}></CommandPrompt>
+            {
+                commandProcessor
+                && <CommandPrompt processor={commandProcessor}></CommandPrompt>
+            }
         </>
     )
 }
