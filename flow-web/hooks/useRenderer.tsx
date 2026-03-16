@@ -5,7 +5,7 @@ import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {EffectComposer} from "three/examples/jsm/postprocessing/EffectComposer.js";
 import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import CommandHandler from "@/simulation/CommandHandler";
+import CommandProcessor from "@/simulation/CommandProcessor";
 import {configureThree} from "@/three/utils";
 
 export default function useRenderer(viewportRef: React.RefObject<HTMLElement | null>) {
@@ -44,7 +44,7 @@ export default function useRenderer(viewportRef: React.RefObject<HTMLElement | n
         const system = new ParticleSystem(scene, particleCount)
         particleSystemRef.current = system
 
-        const commandHandler = new CommandHandler(system)
+        const commandHandler = new CommandProcessor(system)
 
         const listener = (e: CustomEvent<string>) => {
             const cmd = e.detail

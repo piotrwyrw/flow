@@ -8,8 +8,7 @@ type Handler = {
     fn: (cmd: string[]) => void
 }
 
-export default class CommandHandler {
-
+export default class CommandProcessor {
     system: ParticleSystem
     handlers = new Map<string, Handler>([
         ['reset', {
