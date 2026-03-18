@@ -1,6 +1,6 @@
-import ParticleSystem from "@/simulation/ParticleSystem";
+import ParticleSystem from "@/lib/ParticleSystem";
 import {showDetailedToast} from "@/lib/utils";
-import Attractor, {AttractorMode} from "@/simulation/Attractor";
+import Attractor, {AttractorMode} from "@/lib/Attractor";
 import {Vector3} from "three";
 
 type Handler = {

@@ -2,7 +2,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {IconHome, IconPlus, IconTrash} from "@tabler/icons-react";
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
 import {Item, ItemActions, ItemContent, ItemTitle} from "@/components/ui/item";
-import Attractor, {AttractorMode, attractorModeDisplayName} from "@/simulation/Attractor";
+import Attractor, {AttractorMode, attractorModeDisplayName} from "@/lib/Attractor";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Label} from "@/components/ui/label";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import {Slider} from "@/components/ui/slider";
 import React, {useEffect, useState} from "react";
-import ParticleSystem from "@/simulation/ParticleSystem";
+import ParticleSystem from "@/lib/ParticleSystem";
 import * as Three from 'three';
 
 type ControlOverlayProps = {

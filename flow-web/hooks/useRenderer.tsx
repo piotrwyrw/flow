@@ -1,11 +1,11 @@
 import React, {useEffect, useRef} from "react";
-import ParticleSystem from "@/simulation/ParticleSystem";
+import ParticleSystem from "@/lib/ParticleSystem";
 import {ACESFilmicToneMapping, Color, SRGBColorSpace, Vector2} from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {EffectComposer} from "three/examples/jsm/postprocessing/EffectComposer.js";
 import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import CommandProcessor from "@/simulation/CommandProcessor";
+import CommandProcessor from "@/lib/CommandProcessor";
 import {configureThree} from "@/three/utils";
 
 export default function useRenderer(viewportRef: React.RefObject<HTMLElement | null>) {

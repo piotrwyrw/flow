@@ -1,7 +1,7 @@
 import * as Three from 'three'
 import {SphereGeometry, Vector3} from 'three'
 import {randomNormalizedNumber} from "@/three/utils";
-import Attractor, {AttractorMode} from "@/simulation/Attractor";
+import Attractor, {AttractorMode} from "@/lib/Attractor";
 import {showDetailedToast} from "@/lib/utils";
 
 type AttractorListener = (attractors: Attractor[]) => void

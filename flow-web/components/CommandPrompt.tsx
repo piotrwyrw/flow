@@ -1,7 +1,7 @@
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import React from "react";
-import CommandProcessor from "@/simulation/CommandProcessor";
+import CommandProcessor from "@/lib/CommandProcessor";
 
 type CommandPromptProps = {
     processor: CommandProcessor
