@@ -1,17 +1,6 @@
 "use client";
 
-import {
-    emptyFormModel,
-    FieldValue,
-    FormModel,
-    FormSchema,
-    schemaNumberField,
-    schemaSelectField,
-    schemaTextField, Validators
-} from "@/lib/DynamicForms";
-import DynamicForm from "@/components/DynamicForm";
 import {useEffect, useRef, useState} from "react";
-import {Button} from "@/components/ui/button";
 import useRenderer from "@/hooks/useRenderer";
 import CommandProcessor from "@/lib/CommandProcessor";
 import ParticleSystem from "@/lib/ParticleSystem";

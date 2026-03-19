@@ -1,5 +1,3 @@
-import {useId} from "react";
-
 export type FieldValidatorCallback = (value: number | string) => boolean
 
 export namespace Validators {
@@ -68,7 +66,8 @@ export namespace Validators {
 //
 export enum FieldType {
     TEXT,
-    NUMBER,
+    BOUNDED_NUMBER,
+    UNBOUNDED_NUMBER,
     SELECT
 }
 
@@ -79,11 +78,15 @@ export type BaseFormField = {
     isValid: FieldValidatorCallback
 }
 
-export type NumberField = BaseFormField & {
-    type: typeof FieldType.NUMBER
+export type BoundedNumberField = BaseFormField & {
+    type: typeof FieldType.BOUNDED_NUMBER
     minimum: number,
     maximum: number,
     stepSize: number
+}
+
+export type UnboundedNumberField = BaseFormField & {
+    type: typeof FieldType.UNBOUNDED_NUMBER
 }
 
 export type TextField = BaseFormField & {
@@ -98,24 +101,24 @@ export type SelectField<T extends string = string> = BaseFormField & {
 }
 
 /**
- * Create a new number input field
+ * Create a new bounded number input field (Slider)
  * @param label The label text of the field
  * @param min Minimum selectable value
  * @param max Maximum selectable value
  * @param step Value increment size
  * @param isValid Validator instance for this field. Defaults to {@link Validators.NumberInRange} with the given `min`, `max` values
- * @param identifier Unique value used to identify this field in the model. Defaults to {@link useId}
+ * @param identifier Unique value used to identify this field in the model.
  */
-export function schemaNumberField(label: string,
-                                  min: number,
-                                  max: number,
-                                  step: number,
-                                  isValid: FieldValidatorCallback = Validators.NumberInRange(min, max),
-                                  identifier: string = useId()): [string, NumberField] {
+export function schemaBoundedNumberField(label: string,
+                                         min: number,
+                                         max: number,
+                                         step: number,
+                                         identifier: string,
+                                         isValid: FieldValidatorCallback = Validators.NumberInRange(min, max)): [string, BoundedNumberField] {
     return [
         identifier,
         {
-            type: FieldType.NUMBER,
+            type: FieldType.BOUNDED_NUMBER,
             identifier: identifier,
             label: label,
             minimum: min,
@@ -127,14 +130,34 @@ export function schemaNumberField(label: string,
 }
 
 /**
+ * Create a new unbounded number input field
+ * @param label The label text of the field
+ * @param identifier Unique value used to identify this field in the model.
+ * @param isValid Validator instance for this field. Defaults to {@link Validators.NumberNotNaN}
+ */
+export function schemaUnboundedNumberField(label: string,
+                                           identifier: string,
+                                           isValid: FieldValidatorCallback = Validators.NumberNotNaN): [string, UnboundedNumberField] {
+    return [
+        identifier,
+        {
+            type: FieldType.UNBOUNDED_NUMBER,
+            identifier: identifier,
+            label: label,
+            isValid
+        }
+    ]
+}
+
+/**
  * Create a new text input field
  * @param label The label text of the field
+ * @param identifier Unique value used to identify this field in the model.
  * @param isValid Validator instance for this field. Defaults to {@link Validators.StringNotEmpty}
- * @param identifier Unique value used to identify this field in the model. Defaults to {@link useId}
  */
 export function schemaTextField(label: string,
-                                isValid: FieldValidatorCallback = Validators.StringNotEmpty,
-                                identifier: string = useId()): [string, TextField] {
+                                identifier: string,
+                                isValid: FieldValidatorCallback = Validators.StringNotEmpty): [string, TextField] {
     return [
         identifier,
         {
@@ -151,14 +174,14 @@ export function schemaTextField(label: string,
  * @param label The label text of the field
  * @param placeholder Placeholder text displayed in the selection box before any selection was made
  * @param options The selectable options for this field
+ * @param identifier Unique value used to identify this field in the model
  * @param isValid Validator instance for this field. Defaults to {@link Validators.StringIn} with the given options
- * @param identifier Unique value used to identify this field in the model. Defaults to {@link useId}
  */
 export function schemaSelectField<T extends string = string>(label: string,
                                                              placeholder: string,
                                                              options: string[],
-                                                             isValid: FieldValidatorCallback = Validators.StringIn(options),
-                                                             identifier: string = useId()): [string, SelectField] {
+                                                             identifier: string,
+                                                             isValid: FieldValidatorCallback = Validators.StringIn(options)): [string, SelectField] {
     return [
         identifier,
         {
@@ -176,7 +199,11 @@ export function schemaSelectField<T extends string = string>(label: string,
 // --- Form Schema Types ---
 //
 
-export type FormField<T extends string = string> = NumberField | TextField | SelectField<T>
+export type FormField<T extends string = string> =
+    BoundedNumberField
+    | UnboundedNumberField
+    | TextField
+    | SelectField<T>
 
 export type FormSchema<T extends string = string> = FormField<T>[]
 
@@ -211,8 +238,8 @@ export type FormModel = {
     [key: string]: FieldValue
 }
 
-export function emptyFormModel(): FormModel {
-    return {}
+export function emptyFormModel(): MutableFormModel {
+    return createMutableFormModel({})
 }
 
 export type MutableFormModel = {
@@ -221,8 +248,10 @@ export type MutableFormModel = {
     update: (key: string, value: string | number) => void,
     getNumber: (key: string) => number,
     getText: (key: string) => string,
+    getTextAs: <T>(key: string) => T
     getField: (key: string) => FieldValue,
-    validate: () => boolean
+    validate: () => boolean,
+    clear: () => void
 }
 
 /**
@@ -237,7 +266,7 @@ export function createMutableFormModel(model: FormModel): MutableFormModel {
         },
 
         setText(key: string, value: string, isValid: FieldValidatorCallback) {
-            console.debug(`Setting string field '${key}': ${value}`)
+            console.debug(`Setting text field '${key}': ${value}`)
             model[key] = textFieldValue(value, isValid)
         },
 
@@ -253,13 +282,32 @@ export function createMutableFormModel(model: FormModel): MutableFormModel {
                 return
             }
 
-            // Make sure the type of the existing value matches the new value
-            if (typeof model[key].value !== typeof value) {
-                console.error(`Attempted to update a ${typeof model[key]} field with a value of type ${typeof value}`)
+            const modelType = typeof model[key].value
+            const newValueType = typeof value
+
+            if (modelType === "number" && newValueType === "string") {
+                const newValueAsNumber = Number.parseFloat(value as string)
+
+                if (Number.isNaN(newValueAsNumber)) {
+                    console.debug(`Attempted to update number field '${key}' with a text value and number parsing failed. Rejecting the update.`)
+                    return
+                }
+
+                model[key].value = newValueAsNumber
                 return
             }
 
-            model[key].value = value
+            if (modelType == "string" && newValueType === "number") {
+                model[key].value = value.toString()
+                return
+            }
+
+            if (modelType === newValueType) {
+                model[key].value = value
+                return
+            }
+
+            console.error(`Attempted to update a ${typeof model[key].value} field with a value of type ${typeof value}`)
         },
 
         getNumber(key: string): number {
@@ -271,7 +319,7 @@ export function createMutableFormModel(model: FormModel): MutableFormModel {
             const value = model[key]
 
             if (value.type !== FieldValueDataType.NUMBER) {
-                console.error(`Attempted to read string model field '${key}' as number.`)
+                console.error(`Attempted to read text field '${key}' as number.`)
                 return NaN
             }
 
@@ -298,6 +346,10 @@ export function createMutableFormModel(model: FormModel): MutableFormModel {
             return value.value as string
         },
 
+        getTextAs<T>(key: string): T {
+            return this.getText(key) as T
+        },
+
         getField(key: string): FieldValue {
             return model[key]
         },
@@ -314,6 +366,25 @@ export function createMutableFormModel(model: FormModel): MutableFormModel {
                 }
             }
             return true
+        },
+
+        clear() {
+            for (let fieldKey in model) {
+                if (!model.hasOwnProperty(fieldKey)) {
+                    continue
+                }
+
+                const fieldType = typeof model[fieldKey].value
+
+                if (fieldType === "string") {
+                    model[fieldKey].value = ""
+                    continue
+                }
+
+                if (fieldType === "number") {
+                    model[fieldKey].value = 0
+                }
+            }
         }
     }
 }

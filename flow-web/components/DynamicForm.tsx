@@ -12,65 +12,87 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import {ReactNode, useEffect, useState} from "react";
-import {
-    createMutableFormModel,
-    FieldType,
-    FieldValue,
-    FormModel,
-    FormSchema,
-    MutableFormModel
-} from "@/lib/DynamicForms";
+import {Children, cloneElement, isValidElement, ReactElement, ReactNode, useEffect, useState} from "react";
+import {FieldType, FieldValue, FormSchema, MutableFormModel} from "@/lib/DynamicForms";
 
 type DynamicFormProps = {
     schema: FormSchema,
-    model: FormModel,
-    actionsChildren?: ReactNode,
+    model: MutableFormModel,
+    children?: ReactNode,
     valid?: (newValue: boolean) => void,
     onFormFieldChanged?: (affectedField: string, fieldValue: FieldValue) => void
     onSubmit?: (model: MutableFormModel) => void
 }
 
-export default function DynamicForm({schema, model, actionsChildren, valid, onFormFieldChanged, onSubmit}: DynamicFormProps) {
-    const [mutableModel] = useState<MutableFormModel>(createMutableFormModel(model))
+export default function DynamicForm({
+                                        schema,
+                                        model,
+                                        children,
+                                        valid,
+                                        onFormFieldChanged,
+                                        onSubmit
+                                    }: DynamicFormProps) {
     const [formReady, setFormReady] = useState<boolean>(false)
 
     // Used exclusively for triggering re-renders
     const [, setDummy] = useState<number>(0)
 
     useEffect(() => {
+        createModelFromSchema()
+    }, []);
+
+    const createModelFromSchema = () => {
+        setFormReady(false)
+
         schema.forEach(field => {
-            if (field.type === FieldType.NUMBER) {
-                mutableModel.setNumber(field.identifier, 0, field.isValid)
+            if (field.type === FieldType.BOUNDED_NUMBER || field.type === FieldType.UNBOUNDED_NUMBER) {
+                console.debug(`Creating dynamic form number field: ${field.identifier}`)
+                model.setNumber(field.identifier, 0, field.isValid)
             } else {
-                mutableModel.setText(field.identifier, "", field.isValid)
+                console.debug(`Creating dynamic form string field: ${field.identifier}`)
+                model.setText(field.identifier, "", field.isValid)
             }
         })
 
         setFormReady(true)
-    }, []);
-
-    function validateForm() {
-        if (valid) {
-            valid(mutableModel.validate())
-        }
     }
 
-    function handleChange(name: string, value: string | number) {
-        mutableModel.update(name, value)
-        validateForm()
+    const triggerRender = () => {
         setDummy(prev => prev + 1)
-        if (onFormFieldChanged) {
-            onFormFieldChanged(name, mutableModel.getField(name))
+    }
+
+    const validateForm = () => {
+        if (valid) {
+            valid(model.validate())
         }
     }
 
-    function submit() {
+    const invalidate = () => {
+        if (valid) {
+            valid(false)
+        }
+    }
+
+    const handleChange = (name: string, value: string | number) => {
+        model.update(name, value)
+        validateForm()
+        triggerRender()
+        if (onFormFieldChanged) {
+            onFormFieldChanged(name, model.getField(name))
+        }
+    }
+
+    const submit = () => {
         if (!onSubmit) {
             return
         }
 
-        onSubmit(mutableModel)
+        onSubmit(model)
+
+        model.clear()
+        createModelFromSchema()
+        triggerRender()
+        invalidate()
     }
 
     return formReady && (
@@ -87,35 +109,47 @@ export default function DynamicForm({schema, model, actionsChildren, valid, onFo
                                     <Label htmlFor={field.label}>{field.label}</Label>
                                     <Input id={field.identifier}
                                            type="text"
-                                           value={mutableModel.getText(field.identifier)}
+                                           value={model.getText(field.identifier)}
                                            onChange={e => handleChange(field.identifier, e.target.value)}
                                            className="w-full col-span-2 h-8">
                                     </Input>
                                 </div>
                             )}
 
-                            {field.type === FieldType.NUMBER && (
+                            {field.type === FieldType.BOUNDED_NUMBER && (
                                 <div key={index} className="grid grid-cols-1 w-full">
                                     <div className="flex items-center justify-between -mb-1">
                                         <Label htmlFor={field.identifier}>{field.label}</Label>
                                         <span
-                                            className="text-muted-foreground">{mutableModel.getNumber(field.identifier)}</span>
+                                            className="text-muted-foreground">{model.getNumber(field.identifier)}</span>
                                     </div>
                                     <Slider id={field.identifier}
                                             min={field.minimum}
                                             max={field.maximum}
                                             step={field.stepSize}
-                                            value={[mutableModel.getNumber(field.identifier)]}
+                                            value={[model.getNumber(field.identifier)]}
                                             onValueChange={v => handleChange(field.identifier, v[0])}
                                             className="w-full col-span-2 h-8">
                                     </Slider>
                                 </div>
                             )}
 
+                            {field.type === FieldType.UNBOUNDED_NUMBER && (
+                                <div key={index} className="grid grid-cols-3 items-center">
+                                    <Label htmlFor={field.label}>{field.label}</Label>
+                                    <Input id={field.identifier}
+                                           type="number"
+                                           value={model.getNumber(field.identifier)}
+                                           onChange={e => handleChange(field.identifier, e.target.value)}
+                                           className="w-full col-span-2 h-8">
+                                    </Input>
+                                </div>
+                            )}
+
                             {field.type === FieldType.SELECT && (
                                 <div key={index} className="grid grid-cols-3 items-center">
                                     <Label htmlFor={field.identifier}>{field.label}</Label>
-                                    <Select value={mutableModel.getText(field.identifier)}
+                                    <Select value={model.getText(field.identifier)}
                                             onValueChange={v => handleChange(field.identifier, v)}>
                                         <SelectTrigger className="w-full col-span-2 h-8">
                                             <SelectValue id={field.identifier} placeholder={field.placeholder}/>
@@ -136,7 +170,12 @@ export default function DynamicForm({schema, model, actionsChildren, valid, onFo
                         </div>
                     ))
                 }
-
+                {children &&
+                    <div className="w-full flex flex-row">
+                        {Children.map(children, (child, i) => (
+                            isValidElement(child) ? cloneElement(child as ReactElement<any>, {className: "flex-1 " + ((child.props as any).className || "")}) : child
+                        ))}
+                    </div>}
             </div>
         </form>
     )

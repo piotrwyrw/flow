@@ -6,20 +6,18 @@ import Attractor, {AttractorMode, attractorModeDisplayName} from "@/lib/Attracto
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Label} from "@/components/ui/label";
-import {Input} from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
 import {Slider} from "@/components/ui/slider";
 import React, {useEffect, useState} from "react";
 import ParticleSystem from "@/lib/ParticleSystem";
 import * as Three from 'three';
+import {
+    emptyFormModel,
+    FormSchema,
+    MutableFormModel,
+    schemaSelectField,
+    schemaUnboundedNumberField
+} from "@/lib/DynamicForms";
+import DynamicForm from "@/components/DynamicForm";
 
 type ControlOverlayProps = {
     system: ParticleSystem
@@ -56,16 +54,34 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
         system.integrationSubsteps = integrationSubstepNumber[0] || initialIntegrationSubstepNumber
     }, [integrationSubstepNumber]);
 
-    function removeAttractor(index: number) {
-        system.removeAttractor(index)
-    }
+    // Attractor Creation
+    const [attrXId, attrX] = schemaUnboundedNumberField("X Position", "attr_x")
+    const [attrYId, attrY] = schemaUnboundedNumberField("Y Position", "attr_y")
+    const [attrZId, attrZ] = schemaUnboundedNumberField("Z Position", "attr_z")
+    const [attrStrengthId, attrStrength] = schemaUnboundedNumberField("Strength", "attr_strength")
+    const [attrTypeId, attrType] = schemaSelectField<AttractorMode>("Type", "Attractor Type", Object.values(AttractorMode), "attr_type")
 
-    function createAttractor(x: number, y: number, z: number, strength: number, mode: AttractorMode) {
+    const newAttractorSchema: FormSchema = [attrX, attrY, attrZ, attrStrength, attrType]
+    const [newAttractorModel] = useState<MutableFormModel>(emptyFormModel())
+
+    const [newAttractorFormValid, setNewAttractorFormValid] = useState<boolean>(false)
+
+    const createAttractor = () => {
+        const x = newAttractorModel.getNumber(attrXId)
+        const y = newAttractorModel.getNumber(attrYId)
+        const z = newAttractorModel.getNumber(attrZId)
+        const strength = newAttractorModel.getNumber(attrStrengthId)
+        const mode = newAttractorModel.getTextAs<AttractorMode>(attrTypeId)
+
         system.addAttractor(new Attractor(
             new Three.Vector3(x, y, z),
             strength,
             mode
         ))
+    }
+
+    const removeAttractor = (index: number) => {
+        system.removeAttractor(index)
     }
 
     return (
@@ -153,65 +169,14 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
                                                 Create a new particle attractor
                                             </p>
                                         </div>
-                                        <form onSubmit={(e) => {
-                                            e.preventDefault()
-
-                                            const data = new FormData(e.target)
-                                            const x = Number(data.get("x"))
-                                            const y = Number(data.get("y"))
-                                            const z = Number(data.get("z"))
-                                            const strength = Number(data.get("strength"))
-                                            const mode = newAttractorMode as AttractorMode
-
-                                            createAttractor(x, y, z, strength, mode)
-                                        }}>
-                                            <div className="grid gap-2">
-                                                <div className="grid grid-cols-3 items-center gap-4">
-                                                    <Label htmlFor="x">X Position</Label>
-                                                    <Input name="x" id="x" type="number" defaultValue={0}
-                                                           className="col-span-2 h-8"/>
-                                                </div>
-                                                <div className="grid grid-cols-3 items-center gap-4">
-                                                    <Label htmlFor="y">Y Position</Label>
-                                                    <Input name="y" id="y" type="number" defaultValue={0}
-                                                           className="col-span-2 h-8"/>
-                                                </div>
-                                                <div className="grid grid-cols-3 items-center gap-4">
-                                                    <Label htmlFor="z">Z Position</Label>
-                                                    <Input name="z" id="z" type="number" defaultValue={0}
-                                                           className="col-span-2 h-8"/>
-                                                </div>
-                                                <div className="grid grid-cols-3 items-center gap-4">
-                                                    <Label htmlFor="strength">Strength</Label>
-                                                    <Input name="strength" id="strength" type="number"
-                                                           defaultValue={1}
-                                                           className="col-span-2 h-8"/>
-                                                </div>
-                                                <div className="grid grid-cols-3 items-center gap-4">
-                                                    <Label htmlFor="mode">Mode</Label>
-                                                    <Select value={newAttractorMode}
-                                                            onValueChange={setNewAttractorMode}>
-                                                        <SelectTrigger className="w-full col-span-2 h-8 max-w-48">
-                                                            <SelectValue placeholder="Attractor Mode"/>
-                                                        </SelectTrigger>
-                                                        <SelectContent position="item-aligned">
-                                                            <SelectGroup>
-                                                                <SelectLabel>Attractor Mode</SelectLabel>
-                                                                <SelectItem value="constant">Constant</SelectItem>
-                                                                <SelectItem value="linear">Linear</SelectItem>
-                                                                <SelectItem value="inverse_square">
-                                                                    Inverse Square
-                                                                </SelectItem>
-                                                            </SelectGroup>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <Button className="w-full" variant="outline" size="sm"
-                                                        type="submit" disabled={newAttractorMode == ""}>
-                                                    <IconPlus/> Create
-                                                </Button>
-                                            </div>
-                                        </form>
+                                        <DynamicForm schema={newAttractorSchema}
+                                                     model={newAttractorModel}
+                                                     onSubmit={createAttractor}
+                                                     valid={setNewAttractorFormValid}>
+                                            <Button type="submit" disabled={!newAttractorFormValid}>
+                                                <IconPlus/> Create
+                                            </Button>
+                                        </DynamicForm>
                                     </div>
                                 </PopoverContent>
                             </Popover>

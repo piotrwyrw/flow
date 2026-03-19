@@ -1,12 +1,14 @@
 import React, {useEffect, useRef} from "react";
 import ParticleSystem from "@/lib/ParticleSystem";
-import {ACESFilmicToneMapping, Color, SRGBColorSpace, Vector2} from "three";
+import {ACESFilmicToneMapping, Color, Fog, FogExp2, SRGBColorSpace, Vector2, Vector3} from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
+import CommandProcessor from "@/lib/CommandProcessor";
+import {configureThree} from "@/three/utils";
 import {EffectComposer} from "three/examples/jsm/postprocessing/EffectComposer.js";
 import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import CommandProcessor from "@/lib/CommandProcessor";
-import {configureThree} from "@/three/utils";
+import {BokehPass} from "three/examples/jsm/postprocessing/BokehPass.js";
+import {expandPaddingObject} from "@floating-ui/utils";
 
 export default function useRenderer(viewportRef: React.RefObject<HTMLElement | null>) {
     const particleSystemRef = useRef<ParticleSystem | null>(null)
@@ -24,6 +26,8 @@ export default function useRenderer(viewportRef: React.RefObject<HTMLElement | n
 
         let {camera, scene, renderer} = configureThree({width, height})
 
+        scene.fog = new Fog(0x000000, 0.1, 1000)
+
         renderer.setAnimationLoop(animate)
         viewport.appendChild(renderer.domElement)
 
@@ -37,12 +41,24 @@ export default function useRenderer(viewportRef: React.RefObject<HTMLElement | n
         orbitControls.enableZoom = true
         orbitControls.zoomSpeed = 1.0
 
-        const effectComposer = new EffectComposer(renderer)
-        effectComposer.addPass(new RenderPass(scene, camera))
-        effectComposer.addPass(new UnrealBloomPass(new Vector2(width, height), 0.2, 0.5, 0.9))
-
         const system = new ParticleSystem(scene, particleCount)
         particleSystemRef.current = system
+
+        const effectComposer = new EffectComposer(renderer)
+        effectComposer.addPass(new RenderPass(scene, camera))
+
+        const bloomPass = new UnrealBloomPass(new Vector2(width, height), 1, 1, 0.1)
+
+        effectComposer.addPass(bloomPass)
+
+        // const bokehPass = new BokehPass(scene, camera, {
+        //     aspect: camera.aspect,
+        //     focus: 200,
+        //     aperture: 0.00001,
+        //     maxblur: 0.01
+        // })
+        //
+        // effectComposer.addPass(bokehPass)
 
         const commandHandler = new CommandProcessor(system)
 
@@ -56,9 +72,6 @@ export default function useRenderer(viewportRef: React.RefObject<HTMLElement | n
         function animate() {
             orbitControls.update()
             system.update()
-
-            renderer.autoClear = false
-            renderer.clear()
 
             effectComposer.render()
         }

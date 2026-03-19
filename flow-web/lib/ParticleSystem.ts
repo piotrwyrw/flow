@@ -1,8 +1,11 @@
 import * as Three from 'three'
-import {SphereGeometry, Vector3} from 'three'
+import {SphereGeometry, UniformsLib, UniformsUtils, Vector3} from 'three'
 import {randomNormalizedNumber} from "@/three/utils";
 import Attractor, {AttractorMode} from "@/lib/Attractor";
 import {showDetailedToast} from "@/lib/utils";
+
+import * as Shaders from '@/lib/Shaders'
+import {ShaderSource} from "@/lib/Shaders";
 
 type AttractorListener = (attractors: Attractor[]) => void
 
@@ -19,6 +22,7 @@ export default class ParticleSystem {
     velocities: Float32Array
     accelerations: Float32Array
 
+    points: Three.Points
     geometry: Three.BufferGeometry
 
     // Attractor Display
@@ -66,44 +70,32 @@ export default class ParticleSystem {
         this.reset()
         this.syncGeometryAttributes()
 
-        const material = new Three.ShaderMaterial({
-            uniforms: {
-                uFastColor: {value: new Three.Color().setHex(0xff8c00)},
-                uSlowColor: {value: new Three.Color().setHex(0x30e0ff)}
-            },
-            vertexShader: `  
-               attribute float speed;
-               varying float vSpeed;
-                            
-               void main() {
-                    vSpeed = speed;
-                    
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = 2.5;
-               }
-            `,
-            fragmentShader: `
-                varying float vSpeed;
-                uniform vec3 uFastColor;
-                uniform vec3 uSlowColor;
-                
-                void main() {
-                    float d = length(gl_PointCoord - vec2(0.5));
-                    float a = smoothstep(0.5, 0.0, d);
-                
-                    float fac = smoothstep(0.0, 0.2, vSpeed);
-                    vec3 color = uFastColor * fac + uSlowColor * (1.0 - fac);
-                    gl_FragColor = vec4(color, a * 0.15);
-                }
-            `,
-            transparent: true,
-            blending: Three.AdditiveBlending,
-            depthWrite: false
+        Shaders.loadShader("particle").then(shader => {
+            createShaderAndGeometry(shader)
         })
 
-        const points = new Three.Points(this.geometry, material)
+        this.points = new Three.Points()
 
-        scene.add(points)
+        const createShaderAndGeometry = (shader: ShaderSource) => {
+            const material = new Three.ShaderMaterial({
+                uniforms: Three.UniformsUtils.merge([
+                    UniformsLib['fog'],
+                    {uFastColor: {value: new Three.Color().setHex(0xff6200)}},
+                    {uSlowColor: {value: new Three.Color().setHex(0x00b3ff)}}
+                ]),
+                vertexShader: shader.vertexShader,
+                fragmentShader: shader.fragmentShader,
+                transparent: true,
+                blending: Three.AdditiveBlending,
+                depthWrite: false,
+                fog: true
+            })
+
+            this.points.geometry = this.geometry
+            this.points.material = material
+
+            scene.add(this.points)
+        }
     }
 
     addAttractor(a: Attractor) {

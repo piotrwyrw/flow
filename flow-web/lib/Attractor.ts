@@ -1,9 +1,9 @@
 import * as Three from 'three'
 
 export enum AttractorMode {
-    CONSTANT = "constant",
-    LINEAR = "linear",
-    INVERSE_SQUARE = "inverse_square"
+    CONSTANT = "Constant",
+    LINEAR = "Linear",
+    INVERSE_SQUARE = "Inverse Square"
 }
 
 export function attractorModeDisplayName(mode: AttractorMode): string {
