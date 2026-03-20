@@ -15,12 +15,8 @@ export function randomNormalizedNumber(): number {
     return (Math.random() - 0.5) * 2
 }
 
-export function configureThree(viewport: { width: number, height: number }): {
-    camera: Three.PerspectiveCamera,
-    scene: Three.Scene,
-    renderer: Three.WebGLRenderer
-} {
-    const camera = new Three.PerspectiveCamera(50, viewport.width / viewport.height, 10e-4, 10e6)
+export function setupThree(viewportWidth: number, viewportHeight: number): [Three.PerspectiveCamera, Three.Scene, Three.WebGLRenderer] {
+    const camera = new Three.PerspectiveCamera(50, viewportWidth / viewportHeight, 0.0001, 1e20)
     camera.position.z = 10
 
     const scene = new Three.Scene()
@@ -30,10 +26,11 @@ export function configureThree(viewport: { width: number, height: number }): {
         antialias: true,
         alpha: true,
         stencil: false,
-        depth: false
+        depth: false,
+        outputBufferType: Three.FloatType
     })
     renderer.setClearColor(0x000000, 0)
-    renderer.setSize(viewport.width, viewport.height)
+    renderer.setSize(viewportWidth, viewportHeight)
 
-    return {camera, scene, renderer}
+    return [camera, scene, renderer]
 }

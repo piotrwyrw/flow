@@ -1,23 +1,30 @@
 "use client";
 
 import {useEffect, useRef, useState} from "react";
-import useRenderer from "@/hooks/useRenderer";
 import CommandProcessor from "@/lib/CommandProcessor";
 import ParticleSystem from "@/lib/ParticleSystem";
 import ControlOverlay from "@/components/ControlOverlay";
 import CommandPrompt from "@/components/CommandPrompt";
+import RenderPipeline from "@/lib/RenderPipeline";
 
 export default function Page() {
     const rendererRef = useRef<HTMLDivElement>(null)
-    const particleSystemRef = useRenderer(rendererRef)
 
+    const [pipeline, setPipeline] = useState<RenderPipeline | null>(null)
     const [commandProcessor, setCommandProcessor] = useState<CommandProcessor | null>(null)
     const [particleSystem, setParticleSystem] = useState<ParticleSystem | null>(null)
 
     useEffect(() => {
-        particleSystemRef.current && setCommandProcessor(new CommandProcessor(particleSystemRef.current))
-        particleSystemRef.current && setParticleSystem(particleSystemRef.current)
-    }, [particleSystemRef]);
+        if (!rendererRef || !rendererRef.current) {
+            return
+        }
+
+        const p = new RenderPipeline(rendererRef.current, 100000)
+
+        setPipeline(p)
+        setParticleSystem(p.particleSystem)
+        setCommandProcessor(new CommandProcessor(p.particleSystem!))
+    }, [rendererRef]);
 
     return (
         <>

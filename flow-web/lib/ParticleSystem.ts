@@ -1,11 +1,12 @@
 import * as Three from 'three'
-import {SphereGeometry, UniformsLib, UniformsUtils, Vector3} from 'three'
+import {AdditiveBlending, CustomBlending, SphereGeometry, Vector3} from 'three'
 import {randomNormalizedNumber} from "@/three/utils";
 import Attractor, {AttractorMode} from "@/lib/Attractor";
 import {showDetailedToast} from "@/lib/utils";
 
 import * as Shaders from '@/lib/Shaders'
-import {ShaderSource} from "@/lib/Shaders";
+import {ShaderSource} from '@/lib/Shaders'
+import {fallbackModeToFallbackField} from "next/dist/lib/fallback";
 
 type AttractorListener = (attractors: Attractor[]) => void
 
@@ -71,24 +72,26 @@ export default class ParticleSystem {
         this.syncGeometryAttributes()
 
         Shaders.loadShader("particle").then(shader => {
-            createShaderAndGeometry(shader)
+            createMaterialAndGeometry(shader)
         })
 
-        this.points = new Three.Points()
+        this.points = new Three.Points(this.geometry)
 
-        const createShaderAndGeometry = (shader: ShaderSource) => {
+        const createMaterialAndGeometry = (shader: ShaderSource) => {
             const material = new Three.ShaderMaterial({
-                uniforms: Three.UniformsUtils.merge([
-                    UniformsLib['fog'],
-                    {uFastColor: {value: new Three.Color().setHex(0xff6200)}},
-                    {uSlowColor: {value: new Three.Color().setHex(0x00b3ff)}}
-                ]),
+                uniforms: {
+                    uFastColor: {value: new Three.Color().setHex(0xff8f1f)},
+                    uSlowColor: {value: new Three.Color().setHex(0x69beff)}
+                },
                 vertexShader: shader.vertexShader,
                 fragmentShader: shader.fragmentShader,
-                transparent: true,
+
                 blending: Three.AdditiveBlending,
+                // premultipliedAlpha: true,
+
+                transparent: true,
                 depthWrite: false,
-                fog: true
+                depthTest: false,
             })
 
             this.points.geometry = this.geometry
@@ -111,6 +114,11 @@ export default class ParticleSystem {
         showDetailedToast("Attractor Removed", `Removed attractor at (${a.position.x}, ${a.position.y}, ${a.position.z})`)
     }
 
+    private randomParticlePosition(): [number, number, number] {
+        const random = () => randomNormalizedNumber() * 100 / 2
+        return [random(), random(), random()]
+    }
+
     reset() {
         for (let i = 0; i < this.particleCount; i++) {
             const ix = i * 3
@@ -125,9 +133,11 @@ export default class ParticleSystem {
             this.velocities[iy] = 0
             this.velocities[iz] = 0
 
-            this.positions[ix] = randomNormalizedNumber() * 100 / 2
-            this.positions[iy] = randomNormalizedNumber() * 100 / 2
-            this.positions[iz] = randomNormalizedNumber() * 100 / 2
+            const [x, y, z] = this.randomParticlePosition()
+
+            this.positions[ix] = x
+            this.positions[iy] = y
+            this.positions[iz] = z
         }
     }
 
