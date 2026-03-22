@@ -1,6 +1,11 @@
-import ParticleSystem from "@/lib/ParticleSystem";
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import ParticleSystem from "@/lib/simulation/ParticleSystem";
 import {showDetailedToast} from "@/lib/utils";
-import Attractor, {AttractorMode} from "@/lib/Attractor";
+import Attractor, {AttractorMode} from "@/lib/simulation/Attractor";
 import {Vector3} from "three";
 
 type Handler = {

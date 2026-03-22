@@ -1,12 +1,17 @@
-import * as Three from 'three'
-import {AdditiveBlending, CustomBlending, SphereGeometry, Vector3} from 'three'
-import {randomNormalizedNumber} from "@/three/utils";
-import Attractor, {AttractorMode} from "@/lib/Attractor";
-import {showDetailedToast} from "@/lib/utils";
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 
-import * as Shaders from '@/lib/Shaders'
-import {ShaderSource} from '@/lib/Shaders'
-import {fallbackModeToFallbackField} from "next/dist/lib/fallback";
+import * as Three from 'three'
+import {SphereGeometry, Vector3} from 'three'
+import Attractor, {AttractorMode} from "@/lib/simulation/Attractor";
+import {randomNormalizedNumber, showDetailedToast} from "@/lib/utils";
+
+import * as Shaders from '@/lib/render/Shaders'
+import {ShaderSource} from '@/lib/render/Shaders'
+import {getWasmLoaderInstance, WasmModuleLoader, WasmModuleSpecs} from "@/lib/WasmModuleLoader";
+import ParticleMotion from "@/lib/simulation/ParticleMotion";
 
 type AttractorListener = (attractors: Attractor[]) => void
 
@@ -14,14 +19,14 @@ export default class ParticleSystem {
     readonly maxVelocity: number = 50
     readonly maxAcceleration: number = 10
 
+    readonly wasmLoader: WasmModuleLoader
+
     attractorListeners: AttractorListener[] = []
 
     particleCount: number
 
-    // Particle Data
-    positions: Float32Array
-    velocities: Float32Array
-    accelerations: Float32Array
+    // Particle motion data
+    particleMotion: ParticleMotion
 
     points: Three.Points
     geometry: Three.BufferGeometry
@@ -48,12 +53,12 @@ export default class ParticleSystem {
 
     lastFrameTime: number | null = null
 
-    constructor(scene: Three.Scene, count: number) {
+    constructor(wasmLoader: WasmModuleLoader, scene: Three.Scene, count: number, camera: Three.PerspectiveCamera) {
+        this.wasmLoader = wasmLoader
+
         this.particleCount = count
 
-        this.positions = new Float32Array(count * 3)
-        this.velocities = new Float32Array(count * 3)
-        this.accelerations = new Float32Array(count * 3)
+        this.particleMotion = new ParticleMotion(this, wasmLoader.$(WasmModuleSpecs.PARTICLE_MATH_MODULE))
 
         this.geometry = new Three.BufferGeometry()
         this.geometry.setAttribute('position', new Three.BufferAttribute(
@@ -76,19 +81,20 @@ export default class ParticleSystem {
         })
 
         this.points = new Three.Points(this.geometry)
+        this.points.frustumCulled = false
 
         const createMaterialAndGeometry = (shader: ShaderSource) => {
             const material = new Three.ShaderMaterial({
                 uniforms: {
-                    uFastColor: {value: new Three.Color().setHex(0xff8f1f)},
-                    uSlowColor: {value: new Three.Color().setHex(0x69beff)}
+                    uFastColor: {value: new Three.Color().setHex(0xFF5800)},
+                    uSlowColor: {value: new Three.Color().setHex(0x00D1FF)},
+                    uNear: {value: camera.near},
+                    uFar: {value: camera.far}
                 },
                 vertexShader: shader.vertexShader,
                 fragmentShader: shader.fragmentShader,
 
                 blending: Three.AdditiveBlending,
-                // premultipliedAlpha: true,
-
                 transparent: true,
                 depthWrite: false,
                 depthTest: false,
@@ -125,19 +131,19 @@ export default class ParticleSystem {
             const iy = i * 3 + 1
             const iz = i * 3 + 2
 
-            this.accelerations[ix] = 0
-            this.accelerations[iy] = 0
-            this.accelerations[iz] = 0
+            this.particleMotion.accelerations[ix] = 0
+            this.particleMotion.accelerations[iy] = 0
+            this.particleMotion.accelerations[iz] = 0
 
-            this.velocities[ix] = 0
-            this.velocities[iy] = 0
-            this.velocities[iz] = 0
+            this.particleMotion.velocities[ix] = 0
+            this.particleMotion.velocities[iy] = 0
+            this.particleMotion.velocities[iz] = 0
 
             const [x, y, z] = this.randomParticlePosition()
 
-            this.positions[ix] = x
-            this.positions[iy] = y
-            this.positions[iz] = z
+            this.particleMotion.positions[ix] = x
+            this.particleMotion.positions[iy] = y
+            this.particleMotion.positions[iz] = z
         }
     }
 
@@ -149,68 +155,9 @@ export default class ParticleSystem {
 
         this.attractors.forEach(a => a.update())
 
-        const forceVec = new Vector3(0, 0, 0)
-
-        for (let i = 0; i < this.particleCount; i++) {
-            for (let j = 0; j < this.integrationSubsteps; j++) {
-                forceVec.set(0, 0, 0)
-                this.integrate(i, this.timeStep, forceVec)
-            }
-        }
+        this.particleMotion.updateMotion(this.integrationSubsteps, 0.1)
 
         this.syncGeometryAttributes()
-    }
-
-    private integrate(particleIndex: number, dt: number, tmpForceVec: Vector3) {
-        const pos = this.positions
-        const vel = this.velocities
-        const acc = this.accelerations
-        const i = particleIndex
-
-        const ix = i * 3
-        const iy = i * 3 + 1
-        const iz = i * 3 + 2
-
-        const currentPosX = pos[ix]
-        const currentPosY = pos[iy]
-        const currentPosZ = pos[iz]
-
-        // Reset acceleration
-        acc[ix] = 0
-        acc[iy] = 0
-        acc[iz] = 0
-
-        // Sum attractor forces
-        const cumulativeForce = tmpForceVec
-
-        this.attractors.forEach(attractor => {
-            cumulativeForce.add(attractor.forceAt(currentPosX, currentPosY, currentPosZ))
-        })
-
-        const acceleration = this.limitVec([cumulativeForce.x, cumulativeForce.y, cumulativeForce.z], this.maxAcceleration)
-
-        acc[ix] = acceleration[0]
-        acc[iy] = acceleration[1]
-        acc[iz] = acceleration[2]
-
-        const newVX = vel[ix] + acc[ix] * dt
-        const newVY = vel[iy] + acc[iy] * dt
-        const newVZ = vel[iz] + acc[iz] * dt
-
-        const velocity = this.limitVec([newVX, newVY, newVZ], this.maxVelocity)
-
-        vel[ix] = velocity[0]
-        vel[iy] = velocity[1]
-        vel[iz] = velocity[2]
-
-        const damping = this.velocityDamping
-        vel[ix] *= damping
-        vel[iy] *= damping
-        vel[iz] *= damping
-
-        pos[ix] += vel[ix] * dt
-        pos[iy] += vel[iy] * dt
-        pos[iz] += vel[iz] * dt
     }
 
     registerAttractorListener(listener: AttractorListener) {
@@ -228,30 +175,18 @@ export default class ParticleSystem {
         const geometryVelocity = this.geometry.attributes.speed.array as Float32Array
 
         for (let i = 0; i < this.particleCount; i++) {
-            geometryPosition[i * 3] = this.positions[i * 3]
-            geometryPosition[i * 3 + 1] = this.positions[i * 3 + 1]
-            geometryPosition[i * 3 + 2] = this.positions[i * 3 + 2]
+            geometryPosition[i * 3] = this.particleMotion.positions[i * 3]
+            geometryPosition[i * 3 + 1] = this.particleMotion.positions[i * 3 + 1]
+            geometryPosition[i * 3 + 2] = this.particleMotion.positions[i * 3 + 2]
 
-            const vx = this.velocities[i * 3]
-            const vy = this.velocities[i * 3 + 1]
-            const vz = this.velocities[i * 3 + 2]
+            const vx = this.particleMotion.velocities[i * 3]
+            const vy = this.particleMotion.velocities[i * 3 + 1]
+            const vz = this.particleMotion.velocities[i * 3 + 2]
 
             geometryVelocity[i] = Math.sqrt(vx * vx + vy * vy + vz * vz) / this.maxVelocity
         }
 
         this.geometry.attributes.position.needsUpdate = true
         this.geometry.attributes.speed.needsUpdate = true
-    }
-
-    private limitVec(vec: [number, number, number], maxLength: number): [number, number, number] {
-        const [x, y, z] = vec
-        const length = Math.sqrt(x * x + y * y + z * z)
-
-        if (length === 0 || length <= maxLength) {
-            return vec
-        }
-
-        const scale = maxLength / length
-        return [x * scale, y * scale, z * scale]
     }
 }

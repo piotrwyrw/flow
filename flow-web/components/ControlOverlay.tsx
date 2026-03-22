@@ -1,14 +1,18 @@
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {IconHome, IconPlus, IconTrash} from "@tabler/icons-react";
+import {IconHome, IconPlus} from "@tabler/icons-react";
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
-import {Item, ItemActions, ItemContent, ItemTitle} from "@/components/ui/item";
-import Attractor, {AttractorMode, attractorModeDisplayName} from "@/lib/Attractor";
+import Attractor, {AttractorMode} from "@/lib/simulation/Attractor";
 import {Button} from "@/components/ui/button";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Label} from "@/components/ui/label";
 import {Slider} from "@/components/ui/slider";
 import React, {useEffect, useState} from "react";
-import ParticleSystem from "@/lib/ParticleSystem";
+import ParticleSystem from "@/lib/simulation/ParticleSystem";
 import * as Three from 'three';
 import {
     emptyFormModel,
@@ -18,6 +22,7 @@ import {
     schemaUnboundedNumberField
 } from "@/lib/DynamicForms";
 import DynamicForm from "@/components/DynamicForm";
+import AttractorListing from "@/components/AttractorListing";
 
 type ControlOverlayProps = {
     system: ParticleSystem
@@ -32,8 +37,6 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
 
     const initialIntegrationSubstepNumber = 1
     const [integrationSubstepNumber, setIntegrationSubstepNumber] = useState<number[]>([initialIntegrationSubstepNumber])
-
-    const [newAttractorMode, setNewAttractorMode] = useState<string>("")
 
     system.registerAttractorListener(attractors => setAttractors([...attractors]))
 
@@ -54,7 +57,7 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
         system.integrationSubsteps = integrationSubstepNumber[0] || initialIntegrationSubstepNumber
     }, [integrationSubstepNumber]);
 
-    // Attractor Creation
+    // Attractor Creation Form
     const [attrXId, attrX] = schemaUnboundedNumberField("X Position", "attr_x")
     const [attrYId, attrY] = schemaUnboundedNumberField("Y Position", "attr_y")
     const [attrZId, attrZ] = schemaUnboundedNumberField("Z Position", "attr_z")
@@ -112,47 +115,7 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
                             <CardDescription>List or manage attractors</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-col gap-2">
-                                {attractors.map(((attr, index) => (
-                                    <Item variant="outline" key={index}>
-                                        <ItemContent className="gap-1">
-                                            <ItemTitle>Attractor {index + 1}</ItemTitle>
-                                            <div className="grid grid-cols-3">
-                                                <span className="col-span-2">Mode</span>
-                                                <span
-                                                    className="col-span-1 text-muted-foreground">{attractorModeDisplayName(attr.mode)}</span>
-                                            </div>
-                                            <div className="grid grid-cols-3">
-                                                <span className="col-span-2">Strength</span>
-                                                <span
-                                                    className="col-span-1 text-muted-foreground">{attr.strength}</span>
-                                            </div>
-                                            <div className="grid grid-cols-3 whitespace-nowrap gap-2">
-                                                <div className="overflow-hidden text-ellipsis">
-                                                    <span>X</span>
-                                                    <span className="text-muted-foreground">{attr.position.x}</span>
-                                                </div>
-                                                <div className="overflow-hidden text-ellipsis">
-                                                    <span>Y</span>
-                                                    <span className="text-muted-foreground">{attr.position.y}</span>
-                                                </div>
-                                                <div className="overflow-hidden text-ellipsis">
-                                                    <span>Z</span>
-                                                    <span className="text-muted-foreground">{attr.position.z}</span>
-                                                </div>
-                                            </div>
-                                        </ItemContent>
-                                        <ItemActions>
-                                            <Button variant="destructive" size="icon"
-                                                    onClick={() => {
-                                                        removeAttractor(index)
-                                                    }}>
-                                                <IconTrash/>
-                                            </Button>
-                                        </ItemActions>
-                                    </Item>
-                                )))}
-                            </div>
+                            <AttractorListing attractors={attractors} onRemoveAttractor={removeAttractor}/>
                         </CardContent>
                         <CardFooter className="flex-col gap-2">
                             <Popover>

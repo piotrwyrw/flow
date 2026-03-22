@@ -1,18 +1,30 @@
-import ParticleSystem from "@/lib/ParticleSystem";
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import ParticleSystem from "@/lib/simulation/ParticleSystem";
 
 import {setupThree} from "@/three/utils";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 
 import * as Three from "three"
-import {Vector2} from "three"
 import {ViewportGizmo} from "three-viewport-gizmo";
+import BlendingRenderPass from "@/lib/render/BlendingRenderPass";
 import {EffectComposer} from "three/examples/jsm/postprocessing/EffectComposer.js";
 import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import {Vector2} from "three";
+import {WasmModuleLoader} from "@/lib/WasmModuleLoader";
 
 export default class RenderPipeline {
+    readonly wasmLoader: WasmModuleLoader
+
     particleCount: number
     viewport: HTMLElement
+
+    width!: number
+    height!: number
 
     camera!: Three.PerspectiveCamera
     scene!: Three.Scene
@@ -27,20 +39,24 @@ export default class RenderPipeline {
 
     particleSystem: ParticleSystem
 
-    constructor(viewport: HTMLElement, particleCount: number) {
+    constructor(viewport: HTMLElement, particleCount: number, wasmLoader: WasmModuleLoader) {
+        this.wasmLoader = wasmLoader
+
         this.particleCount = particleCount
         this.viewport = viewport
+
+        this.getViewportDimensions()
 
         this.setupThreeObjects()
         this.setupCameraControls()
 
-        this.particleSystem = new ParticleSystem(this.scene, this.particleCount)
+        this.particleSystem = new ParticleSystem(wasmLoader, this.scene, this.particleCount, this.camera)
 
         this.setupRenderPipeline()
 
         window.addEventListener("resize", this.onResize.bind(this))
 
-        requestAnimationFrame(this.render.bind(this))
+        this.renderer.setAnimationLoop(() => this.render())
 
         this.viewport.appendChild(this.renderer.domElement)
     }
@@ -62,9 +78,12 @@ export default class RenderPipeline {
             new Vector2(this.viewport.clientWidth, this.viewport.clientHeight),
             0.5,
             0.25,
-            0.3
+            0.5
         )
         this.effectComposer.addPass(this.bloomPass)
+
+        // this.getViewportDimensions()
+        // this.blendingPass = new BlendingRenderPass(this.camera, this.scene, this.renderer, this.width, this.height)
     }
 
     private setupCameraControls() {
@@ -83,10 +102,9 @@ export default class RenderPipeline {
     }
 
     private getViewportDimensions(): [number, number] {
-        return [
-            this.viewport.clientWidth,
-            this.viewport.clientHeight
-        ]
+        this.width = this.viewport.clientWidth
+        this.height = this.viewport.clientHeight
+        return [this.width, this.height]
     }
 
     private render() {
@@ -95,14 +113,12 @@ export default class RenderPipeline {
 
         this.effectComposer.render()
         this.viewportGizmo.render()
-
-        requestAnimationFrame(this.render.bind(this))
     }
 
     private onResize() {
         const [width, height] = this.getViewportDimensions()
 
-        this.bloomPass.resolution.set(width, height)
+        // this.bloomPass.resolution.set(width, height)
         this.renderer.setSize(width, height)
 
         this.viewportGizmo.update()

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import React from "react";

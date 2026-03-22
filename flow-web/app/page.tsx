@@ -1,29 +1,42 @@
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 "use client";
 
 import {useEffect, useRef, useState} from "react";
 import CommandProcessor from "@/lib/CommandProcessor";
-import ParticleSystem from "@/lib/ParticleSystem";
+import ParticleSystem from "@/lib/simulation/ParticleSystem";
 import ControlOverlay from "@/components/ControlOverlay";
 import CommandPrompt from "@/components/CommandPrompt";
-import RenderPipeline from "@/lib/RenderPipeline";
+import RenderPipeline from "@/lib/render/RenderPipeline";
+import {WasmModuleLoader, WasmModuleSpecs} from "@/lib/WasmModuleLoader";
 
 export default function Page() {
     const rendererRef = useRef<HTMLDivElement>(null)
 
     const [pipeline, setPipeline] = useState<RenderPipeline | null>(null)
     const [commandProcessor, setCommandProcessor] = useState<CommandProcessor | null>(null)
-    const [particleSystem, setParticleSystem] = useState<ParticleSystem | null>(null)
+    const [particleSystem, setParticleSystem] = useState<ParticleSystem | null>(null);
+
+    const [wasmLoader, setWasmLoader] = useState<WasmModuleLoader | null>(null)
 
     useEffect(() => {
-        if (!rendererRef || !rendererRef.current) {
+        if (!rendererRef.current)
             return
-        }
 
-        const p = new RenderPipeline(rendererRef.current, 100000)
+        const loader = new WasmModuleLoader()
+        loader.loadMissingModules().then(() => {
+            setWasmLoader(loader)
 
-        setPipeline(p)
-        setParticleSystem(p.particleSystem)
-        setCommandProcessor(new CommandProcessor(p.particleSystem!))
+            const pipe = new RenderPipeline(rendererRef.current!, 100000, loader)
+            const processor = new CommandProcessor(pipe.particleSystem)
+
+            setPipeline(pipe)
+            setCommandProcessor(processor)
+            setParticleSystem(pipe.particleSystem)
+        })
     }, [rendererRef]);
 
     return (
@@ -43,23 +56,4 @@ export default function Page() {
             }
         </>
     )
-
-    // const [nameId, nameField] = schemaTextField("Name", Validators.NotEmptyString, "name")
-    // const [attractorTypeId, attractorTypeField] = schemaSelectField("Attractor Type", "Attractor Type", ["Constant", "Linear", "Newtonian"],
-    //     Validators.NotEmptyString, "attractorType")
-    // const [strengthId, strengthField] = schemaNumberField("Strength", 0, 1000, 1,
-    //     Validators.NumberRange(0, 500), "strength")
-    //
-    // const [valid, setValid] = useState<boolean>()
-    //
-    // const formSchema: FormSchema = [nameField, attractorTypeField, strengthField]
-    //
-    // const formModel: FormModel = emptyFormModel()
-    //
-    // return (
-    //     <div className="w-100">
-    //         <DynamicForm schema={formSchema} model={formModel} valid={setValid}></DynamicForm>
-    //         { valid && <Button>Submit</Button> }
-    //     </div>
-    // )
 }

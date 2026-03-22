@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 export type FieldValidatorCallback = (value: number | string) => boolean
 
 export namespace Validators {
