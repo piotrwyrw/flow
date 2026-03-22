@@ -45,7 +45,7 @@ export default class RenderPipeline {
         this.particleCount = particleCount
         this.viewport = viewport
 
-        this.getViewportDimensions()
+        const [width, height] = this.getViewportDimensions()
 
         this.setupThreeObjects()
         this.setupCameraControls()
@@ -56,6 +56,7 @@ export default class RenderPipeline {
 
         window.addEventListener("resize", this.onResize.bind(this))
 
+        this.renderer.setPixelRatio(width / height)
         this.renderer.setAnimationLoop(() => this.render())
 
         this.viewport.appendChild(this.renderer.domElement)
@@ -72,18 +73,19 @@ export default class RenderPipeline {
 
     private setupRenderPipeline() {
         this.effectComposer = new EffectComposer(this.renderer)
+
+        this.effectComposer.setSize(this.width, this.height)
+        this.effectComposer.setPixelRatio(this.width / this.height)
+
         this.effectComposer.addPass(new RenderPass(this.scene, this.camera))
 
         this.bloomPass = new UnrealBloomPass(
-            new Vector2(this.viewport.clientWidth, this.viewport.clientHeight),
+            new Vector2(this.width, this.height),
             0.5,
             0.25,
             0.5
         )
         this.effectComposer.addPass(this.bloomPass)
-
-        // this.getViewportDimensions()
-        // this.blendingPass = new BlendingRenderPass(this.camera, this.scene, this.renderer, this.width, this.height)
     }
 
     private setupCameraControls() {
@@ -102,8 +104,8 @@ export default class RenderPipeline {
     }
 
     private getViewportDimensions(): [number, number] {
-        this.width = this.viewport.clientWidth
-        this.height = this.viewport.clientHeight
+        this.width = window.innerWidth
+        this.height = window.innerHeight
         return [this.width, this.height]
     }
 
@@ -118,8 +120,13 @@ export default class RenderPipeline {
     private onResize() {
         const [width, height] = this.getViewportDimensions()
 
-        // this.bloomPass.resolution.set(width, height)
-        this.renderer.setSize(width, height)
+        this.effectComposer.setSize(width, height)
+        this.effectComposer.setPixelRatio(width / height)
+
+        this.bloomPass.resolution.set(width, height)
+
+        this.renderer.setPixelRatio(width / height)
+        this.renderer.setSize(width, height, true)
 
         this.viewportGizmo.update()
 

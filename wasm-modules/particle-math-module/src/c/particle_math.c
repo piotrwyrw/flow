@@ -4,18 +4,22 @@
 #include <wasm_simd128.h>
 #include <particle_math.h>
 
-void integrate_motions(const unsigned int particle_count,
-                       const float dt,
-                       float *const pos,
-                       float *const vel,
+void compute_accelerations(unsigned int p_count, unsigned int attr_count, float *attr_pos, float *attr_strength,
+                           float *p_acc) {
+
+}
+
+void integrate_motions(const unsigned int particle_count, const float dt, float *const pos, float *const vel,
                        const float *const acc) {
     uint32_t i = 0;
+
+    // Put dt on all SIMD lanes
+    const v128_t dt_vec = wasm_f32x4_splat(dt);
 
     for (; i < particle_count - 4; i += 4) {
         v128_t p = wasm_v128_load(&pos[i]);
         v128_t v = wasm_v128_load(&vel[i]);
         const v128_t a = wasm_v128_load(&acc[i]);
-        const v128_t dt_vec = wasm_f32x4_splat(dt);
 
         // v = v + a * dt
         v = wasm_f32x4_add(v, wasm_f32x4_mul(a, dt_vec));
