@@ -1,4 +1,4 @@
-#define MIN_ALPHA 0.05
+#define MIN_ALPHA 0.25
 #define MAX_ALPHA 1.0
 
 varying float vSpeed;

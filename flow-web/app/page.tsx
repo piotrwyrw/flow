@@ -5,13 +5,13 @@
 
 "use client";
 
-import {useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import CommandProcessor from "@/lib/CommandProcessor";
 import ParticleSystem from "@/lib/simulation/ParticleSystem";
 import ControlOverlay from "@/components/ControlOverlay";
 import CommandPrompt from "@/components/CommandPrompt";
 import RenderPipeline from "@/lib/render/RenderPipeline";
-import {WasmModuleLoader, WasmModuleSpecs} from "@/lib/WasmModuleLoader";
+import {getWasmLoaderInstance, WasmModuleLoader} from "@/lib/WasmModuleLoader";
 
 export default function Page() {
     const rendererRef = useRef<HTMLDivElement>(null)
@@ -26,7 +26,7 @@ export default function Page() {
         if (!rendererRef.current)
             return
 
-        const loader = new WasmModuleLoader()
+        const loader = getWasmLoaderInstance()
         loader.loadMissingModules().then(() => {
             setWasmLoader(loader)
 

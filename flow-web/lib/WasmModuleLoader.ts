@@ -22,6 +22,7 @@ export type BaseWasmModule<T extends WasmModuleSpec = WasmModuleSpec> = {
     // MM functions available in all modules
     malloc: (size: number) => number,
     free: (ptr: number) => void,
+    realloc: (ptr: number, size: number) => number,
 
     // Integer Heap Views
     HEAP8: Int8Array,
@@ -35,14 +36,60 @@ export type BaseWasmModule<T extends WasmModuleSpec = WasmModuleSpec> = {
 
     // Float Heap Views
     HEAPF32: Float32Array,
-    HEAPF64: Float64Array
+    HEAPF64: Float64Array,
 }
 
 export type ParticleMathModule = BaseWasmModule<typeof WasmModuleSpecs.PARTICLE_MATH_MODULE> & {
-    integrateParticleMotion: (particleCount: number, integrationSteps: number, dt: number, posPtr: number, velPtr: number, accelPtr: number) => void
+    integrateParticleMotion: (integrationSteps: number,
+                              particleCount: number,
+                              dt: number,
+                              //
+                              // Particle Positions (SoA for SIMD perf)
+                              //
+                              particleXPositionArrayPtr: number,
+                              particleYPositionArrayPtr: number,
+                              particleZPositionArrayPtr: number,
+                              //
+                              // Particle Velocities (SoA for SIMD perf)
+                              //
+                              particleXVelocityArrayPtr: number,
+                              particleYVelocityArrayPtr: number,
+                              particleZVelocityArrayPtr: number,
+                              //
+                              // Particle Accelerations (SoA for SIMD perf)
+                              //
+                              particleXAccelerationArrayPtr: number,
+                              particleYAccelerationArrayPtr: number,
+                              particleZAccelerationArrayPtr: number) => void,
+
+    computeAccelerations: (particleCount: number,
+                           attractorCount: number,
+                           attractorTypesPtr: number,
+                           //
+                           // Attractor Positions (SoA for SIMD perf)
+                           //
+                           attractorXPositionArrayPtr: number,
+                           attractorYPositionArrayPtr: number,
+                           attractorZPositionArrayPtr: number,
+                           // ---
+                           attractorStrengthsPtr: number,
+                           //
+                           // Particle Positions (SoA for SIMD perf)
+                           //
+                           particleXPositionArrayPtr: number,
+                           particleYPositionArrayPtr: number,
+                           particleZPositionArrayPtr: number,
+                           //
+                           // Particle Accelerations (SoA for SIMD perf)
+                           //
+                           particleXAccelerationArrayPtr: number,
+                           particleYAccelerationArrayPtr: number,
+                           particleZAccelerationArrayPtr: number) => void
 }
 
 export type AnyWasmModule = ParticleMathModule
+
+export type PMM = ParticleMathModule
 
 export type ModuleTypeFor<T extends WasmModuleSpec> =
     T extends typeof WasmModuleSpecs.PARTICLE_MATH_MODULE ? ParticleMathModule :
@@ -59,27 +106,82 @@ export type ModuleFactoryMap = {
 export class WasmModuleLoader {
     readonly factories: ModuleFactoryMap = {
         ParticleMathModule: (spec, module, script) => {
-            const functionIdentifier = "integrate_motions_n"
-
-            const integrateFn = module.cwrap(functionIdentifier, null, ['number', 'number', 'number', 'number', 'number', 'number'])
-
+            const integrateFnIdentifier = "integrate_motions_n"
+            const integrateFn = module.cwrap(integrateFnIdentifier, null, ['number', 'number', 'number', 'number', 'number', 'number'])
             if (!integrateFn) {
-                throw new Error(`Could not retrieve function "${functionIdentifier}" while loading module ${spec.jsModule} from ${spec.url}`)
+                throw new Error(`Could not retrieve function "${integrateFnIdentifier}" while loading module ${spec.jsModule} from ${spec.url}`)
+            }
+
+            const computeAccelerationsFnIdentifier = "compute_accelerations"
+            const computeAccelerationsFn = module.cwrap(computeAccelerationsFnIdentifier, null, ['number', 'number', 'number', 'number', 'number', 'number', 'number'])
+            if (!computeAccelerationsFn) {
+                throw new Error(`Could not retrieve function "${computeAccelerationsFnIdentifier}" while loading module ${spec.jsModule} from ${spec.url}`)
             }
 
             return {
                 type: WasmModuleSpecs.PARTICLE_MATH_MODULE.jsModule,
                 scriptElement: script,
-                integrateParticleMotion: (particleCount, integrationSteps, dt, posPtr, velPtr, accelPtr) => {
-                    integrateFn(particleCount, integrationSteps, dt, posPtr, velPtr, accelPtr)
+                integrateParticleMotion: (integrationSteps,
+                                          particleCount,
+                                          dt,
+                                          particleXPositionArrayPtr,
+                                          particleYPositionArrayPtr,
+                                          particleZPositionArrayPtr,
+                                          particleXVelocityArrayPtr,
+                                          particleYVelocityArrayPtr,
+                                          particleZVelocityArrayPtr,
+                                          particleXAccelerationArrayPtr,
+                                          particleYAccelerationArrayPtr,
+                                          particleZAccelerationArrayPtr) => {
+                    integrateFn(
+                        integrationSteps,
+                        particleCount,
+                        dt,
+                        particleXPositionArrayPtr,
+                        particleYPositionArrayPtr,
+                        particleZPositionArrayPtr,
+                        particleXVelocityArrayPtr,
+                        particleYVelocityArrayPtr,
+                        particleZVelocityArrayPtr,
+                        particleXAccelerationArrayPtr,
+                        particleYAccelerationArrayPtr,
+                        particleZAccelerationArrayPtr
+                    )
+                },
+                computeAccelerations: (particleCount,
+                                       attractorCount,
+                                       attractorTypesPtr,
+                                       attractorXPositionArrayPtr,
+                                       attractorYPositionArrayPtr,
+                                       attractorZPositionArrayPtr,
+                                       attractorStrengthsPtr,
+                                       particleXPositionArrayPtr,
+                                       particleYPositionArrayPtr,
+                                       particleZPositionArrayPtr,
+                                       particleXAccelerationArrayPtr,
+                                       particleYAccelerationArrayPtr,
+                                       particleZAccelerationArrayPtr) => {
+                    computeAccelerationsFn(
+                        particleCount,
+                        attractorCount,
+                        attractorTypesPtr,
+                        attractorXPositionArrayPtr,
+                        attractorYPositionArrayPtr,
+                        attractorZPositionArrayPtr,
+                        attractorStrengthsPtr,
+                        particleXPositionArrayPtr,
+                        particleYPositionArrayPtr,
+                        particleZPositionArrayPtr,
+                        particleXAccelerationArrayPtr,
+                        particleYAccelerationArrayPtr,
+                        particleZAccelerationArrayPtr
+                    )
                 }
             } as ParticleMathModule
         }
     }
 
     private modules: Partial<Record<WasmModuleSpec['jsModule'], AnyWasmModule>> = {}
-
-    private hasLoadedAllModules: boolean = false
 
     $<T extends WasmModuleSpec>(spec: T): ModuleTypeFor<T> {
         const module = this.modules[spec.jsModule]
@@ -89,8 +191,8 @@ export class WasmModuleLoader {
         return module as ModuleTypeFor<T>
     }
 
-    private async load<T extends WasmModuleSpec>(spec: T): Promise<ModuleTypeFor<T>> {
-        if (this.modules[spec.jsModule]) return this.modules[spec.jsModule]! as ModuleTypeFor<T>
+    private async load<T extends WasmModuleSpec>(spec: T): Promise<void> {
+        if (this.modules[spec.jsModule]) return
 
         let scriptElement: HTMLScriptElement | null = null
 
@@ -115,46 +217,54 @@ export class WasmModuleLoader {
             return Promise.reject(new Error(`Could not find matching factory for module ${spec.jsModule}`))
         }
 
-        let wasmModule: AnyWasmModule = factory(spec, module, scriptElement)
+        let specializedModule: AnyWasmModule = factory(spec, module, scriptElement)
 
-        wasmModule.malloc = module._malloc
-        wasmModule.free = module._free
+        // Use getters to avoid stale views on malloc
+        const moduleBase = {
+            get HEAP8() {
+                return module.HEAP8
+            },
+            get HEAP16() {
+                return module.HEAP16
+            },
+            get HEAP32() {
+                return module.HEAP32
+            },
 
-        wasmModule.HEAP8 = module.HEAP8
-        wasmModule.HEAP16 = module.HEAP16
-        wasmModule.HEAP32 = module.HEAP32
+            get HEAPU8() {
+                return module.HEAPU8
+            },
+            get HEAPU16() {
+                return module.HEAPU16
+            },
+            get HEAPU32() {
+                return module.HEAPU32
+            },
 
-        wasmModule.HEAPU8 = module.HEAPU8
-        wasmModule.HEAPU16 = module.HEAPU16
-        wasmModule.HEAPU32 = module.HEAPU32
+            get HEAPF32() {
+                return module.HEAPF32
+            },
+            get HEAPF64() {
+                return module.HEAPF64
+            },
 
-        wasmModule.HEAPF32 = module.HEAPF32
-        wasmModule.HEAPF64 = module.HEAPF64
+            malloc: module._malloc,
+            free: module._free,
+            realloc: module._realloc
+        } as BaseWasmModule
 
-        this.modules[spec.jsModule] = wasmModule
-        return wasmModule as ModuleTypeFor<T>
+        this.modules[spec.jsModule] = { ...moduleBase, ...specializedModule } as ModuleTypeFor<T>
     }
 
-    async loadMissingModules() {
-        this.hasLoadedAllModules = false
+    async loadMissingModules(): Promise<void> {
         for (const specKey of Object.keys(WasmModuleSpecs) as Array<keyof typeof WasmModuleSpecs>) {
             const spec = WasmModuleSpecs[specKey]
             if (!this.modules[spec.jsModule]) {
                 await this.load(spec)
             }
         }
-        this.hasLoadedAllModules = true
         return Promise.resolve()
     }
-
-    getLoadedModules(): AnyWasmModule[] {
-        return Object.values(this.modules)
-    }
-
-    areModulesLoaded(): boolean {
-        return this.hasLoadedAllModules
-    }
-
 }
 
 let moduleLoader: WasmModuleLoader | null = null

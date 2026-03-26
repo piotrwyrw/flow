@@ -42,19 +42,19 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
 
     // Sync the initial state of the system and controls
     useEffect(() => {
-        setParticleCount(system.particleCount)
-        setAttractors(system.attractors)
+        setParticleCount(system.particleCount())
+        setAttractors(system.attractors())
 
-        system.timeStep = integrationTimeStep[0]
-        system.integrationSubsteps = integrationSubstepNumber[0]
+        system.setTimeStep(integrationTimeStep[0])
+        system.setIntegrationStepCount(integrationSubstepNumber[0])
     }, [system])
 
     useEffect(() => {
-        system.timeStep = integrationTimeStep[0] || initialIntegrationTimeStep
+        system.setTimeStep(integrationTimeStep[0] || initialIntegrationTimeStep)
     }, [integrationTimeStep]);
 
     useEffect(() => {
-        system.integrationSubsteps = integrationSubstepNumber[0] || initialIntegrationSubstepNumber
+        system.setIntegrationStepCount(integrationSubstepNumber[0] || initialIntegrationSubstepNumber)
     }, [integrationSubstepNumber]);
 
     // Attractor Creation Form
@@ -84,7 +84,7 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
     }
 
     const removeAttractor = (index: number) => {
-        system.removeAttractor(index)
+        // TODO system.removeAttractor(index)
     }
 
     return (

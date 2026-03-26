@@ -4,86 +4,50 @@
  */
 
 import * as Three from 'three'
-import {SphereGeometry, Vector3} from 'three'
-import Attractor, {AttractorMode} from "@/lib/simulation/Attractor";
-import {randomNormalizedNumber, showDetailedToast} from "@/lib/utils";
 
 import * as Shaders from '@/lib/render/Shaders'
-import {ShaderSource} from '@/lib/render/Shaders'
-import {getWasmLoaderInstance, WasmModuleLoader, WasmModuleSpecs} from "@/lib/WasmModuleLoader";
-import ParticleMotion from "@/lib/simulation/ParticleMotion";
+import {ParticleMathModule, WasmModuleLoader, WasmModuleSpecs} from "@/lib/WasmModuleLoader";
+import ParticleSystemBuffer from "@/lib/simulation/ParticleSystemBuffer";
+import Attractor from "@/lib/simulation/Attractor";
 
-type AttractorListener = (attractors: Attractor[]) => void
+export type AttractorListener = (attractors: Attractor[]) => void
 
 export default class ParticleSystem {
     readonly maxVelocity: number = 50
-    readonly maxAcceleration: number = 10
 
     readonly wasmLoader: WasmModuleLoader
 
-    attractorListeners: AttractorListener[] = []
-
-    particleCount: number
-
     // Particle motion data
-    particleMotion: ParticleMotion
+    readonly buffer: ParticleSystemBuffer
 
     points: Three.Points
     geometry: Three.BufferGeometry
 
-    // Attractor Display
-    attractorPositions: Float32Array
-    attractorGeometries: SphereGeometry[]
-
-    // Simulation Parameters
-    timeStep: number = 0.01
-    velocityDamping: number = 1
-    integrationSubsteps: number = 1
-
-    angle = 0.0
-    yAngle = 0.0
-
-    attractors: Attractor[] = [
-        new Attractor(new Three.Vector3(-20, 0, 10), 200, AttractorMode.CONSTANT, (a) => {
-            a.position.set(Math.cos(this.angle) * 20, Math.cos(this.yAngle) * 30, Math.sin(this.angle) * 20)
-            this.angle += this.timeStep
-            this.yAngle += this.timeStep
-        }),
-    ]
-
     lastFrameTime: number | null = null
+
+    attractorListeners: AttractorListener[]
 
     constructor(wasmLoader: WasmModuleLoader, scene: Three.Scene, count: number, camera: Three.PerspectiveCamera) {
         this.wasmLoader = wasmLoader
 
-        this.particleCount = count
-
-        this.particleMotion = new ParticleMotion(this, wasmLoader.$(WasmModuleSpecs.PARTICLE_MATH_MODULE))
-
         this.geometry = new Three.BufferGeometry()
-        this.geometry.setAttribute('position', new Three.BufferAttribute(
-            new Float32Array(count * 3),
-            3
-        ))
-        this.geometry.setAttribute('speed', new Three.BufferAttribute(
-            new Float32Array(count),
-            1
-        ))
+        this.geometry.setAttribute('position', new Three.BufferAttribute(new Float32Array(count * 3), 3))
+        this.geometry.setAttribute('speed', new Three.BufferAttribute(new Float32Array(count), 1))
 
-        this.attractorPositions = new Float32Array(this.attractors.length)
-        this.attractorGeometries = []
-
-        this.reset()
+        this.buffer = new ParticleSystemBuffer(
+            this,
+            count,
+            wasmLoader.$(WasmModuleSpecs.PARTICLE_MATH_MODULE)
+        )
+        this.buffer.resetParticles()
         this.syncGeometryAttributes()
-
-        Shaders.loadShader("particle").then(shader => {
-            createMaterialAndGeometry(shader)
-        })
 
         this.points = new Three.Points(this.geometry)
         this.points.frustumCulled = false
 
-        const createMaterialAndGeometry = (shader: ShaderSource) => {
+        this.attractorListeners = []
+
+        Shaders.loadShader("particle").then(shader => {
             const material = new Three.ShaderMaterial({
                 uniforms: {
                     uFastColor: {value: new Three.Color().setHex(0xFF5800)},
@@ -104,89 +68,67 @@ export default class ParticleSystem {
             this.points.material = material
 
             scene.add(this.points)
-        }
-    }
-
-    addAttractor(a: Attractor) {
-        this.attractors.push(a)
-        this.emitAttractorEvent()
-        showDetailedToast("Attractor Created", `Created a ${a.mode} attractor at (${a.position.x}, ${a.position.y}, ${a.position.z}) with strength ${a.strength}`)
-    }
-
-    removeAttractor(index: number) {
-        const a = this.attractors[index]
-        this.attractors.splice(index, 1)
-        this.emitAttractorEvent()
-        showDetailedToast("Attractor Removed", `Removed attractor at (${a.position.x}, ${a.position.y}, ${a.position.z})`)
-    }
-
-    private randomParticlePosition(): [number, number, number] {
-        const random = () => randomNormalizedNumber() * 100 / 2
-        return [random(), random(), random()]
-    }
-
-    reset() {
-        for (let i = 0; i < this.particleCount; i++) {
-            const ix = i * 3
-            const iy = i * 3 + 1
-            const iz = i * 3 + 2
-
-            this.particleMotion.accelerations[ix] = 0
-            this.particleMotion.accelerations[iy] = 0
-            this.particleMotion.accelerations[iz] = 0
-
-            this.particleMotion.velocities[ix] = 0
-            this.particleMotion.velocities[iy] = 0
-            this.particleMotion.velocities[iz] = 0
-
-            const [x, y, z] = this.randomParticlePosition()
-
-            this.particleMotion.positions[ix] = x
-            this.particleMotion.positions[iy] = y
-            this.particleMotion.positions[iz] = z
-        }
-    }
-
-    update() {
-        if (this.lastFrameTime == null) {
-            this.lastFrameTime = performance.now()
-            return
-        }
-
-        this.attractors.forEach(a => a.update())
-
-        this.particleMotion.updateMotion(this.integrationSubsteps, 0.1)
-
-        this.syncGeometryAttributes()
+        })
     }
 
     registerAttractorListener(listener: AttractorListener) {
         this.attractorListeners.push(listener)
     }
 
-    private emitAttractorEvent() {
-        this.attractorListeners.forEach(listener => {
-            listener(this.attractors)
-        })
+    particleCount(): number {
+        return this.buffer.particleCount
+    }
+
+    timeStep(): number {
+        return this.buffer.timeSep
+    }
+
+    setTimeStep(timeStep: number) {
+        this.buffer.timeSep = timeStep
+    }
+
+    integrationStepCount(): number {
+        return this.buffer.integrationStepCount
+    }
+
+    setIntegrationStepCount(steps: number) {
+        this.buffer.integrationStepCount = steps
+    }
+
+    attractors(): Attractor[] {
+        return this.buffer.attractorObjects
+    }
+
+    addAttractor(attractor: Attractor) {
+        this.buffer.addAttractor(attractor)
+    }
+
+    update() {
+        this.buffer.updateMotion()
+        this.syncGeometryAttributes()
     }
 
     private syncGeometryAttributes() {
-        const geometryPosition = this.geometry.attributes.position.array as Float32Array
-        const geometryVelocity = this.geometry.attributes.speed.array as Float32Array
+        const positionAttribute = this.geometry.attributes.position.array as Float32Array
+        const speedAttribute = this.geometry.attributes.speed.array as Float32Array
 
-        for (let i = 0; i < this.particleCount; i++) {
-            geometryPosition[i * 3] = this.particleMotion.positions[i * 3]
-            geometryPosition[i * 3 + 1] = this.particleMotion.positions[i * 3 + 1]
-            geometryPosition[i * 3 + 2] = this.particleMotion.positions[i * 3 + 2]
+        for (let i = 0; i < this.buffer.particleCount; i++) {
+            positionAttribute[i * 3] = this.buffer.particlePositions.xPtr.value()![i]
+            positionAttribute[i * 3 + 1] = this.buffer.particlePositions.yPtr.value()![i]
+            positionAttribute[i * 3 + 2] = this.buffer.particlePositions.zPtr.value()![i]
 
-            const vx = this.particleMotion.velocities[i * 3]
-            const vy = this.particleMotion.velocities[i * 3 + 1]
-            const vz = this.particleMotion.velocities[i * 3 + 2]
+            const vx = this.buffer.particleVelocities.xPtr.value()![i]
+            const vy = this.buffer.particleVelocities.yPtr.value()![i]
+            const vz = this.buffer.particleVelocities.zPtr.value()![i]
 
-            geometryVelocity[i] = Math.sqrt(vx * vx + vy * vy + vz * vz) / this.maxVelocity
+            speedAttribute[i] = Math.sqrt(vx * vx + vy * vy + vz * vz) / this.maxVelocity
         }
 
         this.geometry.attributes.position.needsUpdate = true
         this.geometry.attributes.speed.needsUpdate = true
+    }
+
+    private triggerAttractorListener() {
+        this.attractorListeners.forEach(listener => listener([]))
     }
 }

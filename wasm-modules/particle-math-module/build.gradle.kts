@@ -5,13 +5,20 @@
 
 object BuildProperties {
     const val CC = "/Users/piotrwyrw/emscripten/emsdk/upstream/emscripten/emcc"
-    const val INCLUDE_DIR = "src/h"
-    const val SRC_DIR = "src/c"
+    const val INCLUDE_DIR = "include"
+    const val SRC_DIR = "src"
     const val OUTPUT_FILE = "../flow-web/public/wasm/particle_math.js"
     const val C_EXTENSION = "c"
     const val MODULE_NAME = "ParticleMathModule"
 
-    val exportedFunctions = arrayOf("integrate_motions_n", "malloc", "free")
+    // Debug mode disables optimizations and enables runtime heap checks
+    const val DEBUG_MODE = false
+
+    val exportedFunctions = arrayOf(
+        "integrate_motions_n", "compute_accelerations", "malloc",
+        "free", "realloc", "memalign", "memcpy"
+    )
+
     val exportedRuntimeFunctions = arrayOf(
         "ccall", "cwrap", "HEAP8", "HEAP16", "HEAP32",
         "HEAPU8", "HEAPU16", "HEAPU32", "HEAPF32", "HEAPF64"
@@ -21,14 +28,16 @@ object BuildProperties {
     fun Array<String>.jsArray() = "[${joinToString(separator = ", ")}]"
 
     val compilerFlags = arrayOf(
-        "-O3",
+        if (DEBUG_MODE) "-O0" else "-O3",
+        "-I$INCLUDE_DIR",
         "-msimd128",
         "-sWASM=1",
         "-sMODULARIZE=1",
         "-sEXPORT_NAME=\"$MODULE_NAME\"",
-        "-I$INCLUDE_DIR",
+        if (DEBUG_MODE) "-sSAFE_HEAP=1" else "-sSAFE_HEAP=0",
         "-sEXPORTED_FUNCTIONS=${exportedFunctions.symbolJsArray()}",
-        "-sEXPORTED_RUNTIME_METHODS=${exportedRuntimeFunctions.jsArray()}"
+        "-sEXPORTED_RUNTIME_METHODS=${exportedRuntimeFunctions.jsArray()}",
+        if (DEBUG_MODE) "-DDEBUG_MODE" else "-UDEBUG_MODE"
     )
 }
 
@@ -50,8 +59,10 @@ tasks.register<Exec>("buildModule") {
     if (!srcDirFile.isDirectory)
         error("Source directory is not a directory: ${srcDirFile.absolutePath}")
 
-    val sourceFiles = srcDirFile.listFiles().filter { it.extension == BuildProperties.C_EXTENSION }
-    val sourceArg = sourceFiles.joinToString(" ")
+    val sourceFiles = srcDirFile.listFiles()
+        .filter { it.extension == BuildProperties.C_EXTENSION }
+        .map { it.absolutePath }
+        .toTypedArray()
 
     val outputFile = rootProject.file(BuildProperties.OUTPUT_FILE)
     val outputPath = outputFile.absolutePath
@@ -63,12 +74,14 @@ tasks.register<Exec>("buildModule") {
 
     val buildCommand = arrayOf<String>(
         BuildProperties.CC,
-        sourceArg,
+        *sourceFiles,
         *(BuildProperties.compilerFlags),
         "-o", outputPath
     )
 
     logger.lifecycle("Build command: ${buildCommand.joinToString(separator = " ")}")
+
+    if (BuildProperties.DEBUG_MODE) logger.lifecycle("WARNING: Debug mode is enabled! This will impact performance. Make sure to disable this option for prod.")
 
     val task = commandLine(*buildCommand)
     task.standardOutput = System.out

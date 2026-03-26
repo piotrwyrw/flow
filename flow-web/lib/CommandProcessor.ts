@@ -19,7 +19,7 @@ export default class CommandProcessor {
         ['reset', {
             paramCount: 0,
             fn: () => {
-                this.system.reset()
+                this.system.buffer.resetParticles()
                 showDetailedToast("Reset", "Particle System Reset")
             }
         }],
