@@ -62,6 +62,10 @@ resetPath
 cd wasm-modules || error "The WASM module directory does not exist. The local tree is likely broken."
 ./gradlew :allModules
 
+# Remove NextJS build cache to be safe (it has caused weird issues for me before)
+resetPath
+rm -rf  flow-web/.next
+
 # Print a nice welcome message
 echo ""
 success "███"
