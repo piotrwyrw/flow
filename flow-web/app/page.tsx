@@ -30,7 +30,7 @@ export default function Page() {
         loader.loadMissingModules().then(() => {
             setWasmLoader(loader)
 
-            const pipe = new RenderPipeline(rendererRef.current!, 100000, loader)
+            const pipe = new RenderPipeline(rendererRef.current!, 200000, loader)
             const processor = new CommandProcessor(pipe.particleSystem)
 
             setPipeline(pipe)

@@ -1,0 +1,3 @@
+[submodule "libs/flow-script"]
+	path = libs/flow-script
+	url = git@github.com:piotrwyrw/flow-script.git
