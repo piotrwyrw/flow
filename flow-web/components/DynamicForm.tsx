@@ -112,7 +112,7 @@ export default function DynamicForm({
                             {field.type === FieldType.TEXT && (
                                 <div key={index} className="grid grid-cols-3 items-center">
                                     <Label htmlFor={field.label}>{field.label}</Label>
-                                    <Input id={field.identifier}
+                                    <Input id={field.label}
                                            type="text"
                                            value={model.getText(field.identifier)}
                                            onChange={e => handleChange(field.identifier, e.target.value)}

@@ -121,12 +121,12 @@ void integrate_motions(const uint32_t particle_count,
                        const float *p_y_accel,
                        const float *p_z_accel)
 {
+    // Put dt on all 4 SIMD lanes
+    const v128_t dt_vec = wasm_f32x4_splat(dt);
+
     uint32_t i = 0;
 
     for (; i < particle_count; i += 4) {
-        // Put dt on all 4 SIMD lanes
-        const v128_t dt_vec = wasm_f32x4_splat(dt);
-
         // Particle positions
         v128_t px = wasm_v128_load(&p_x_pos[i]);
         v128_t py = wasm_v128_load(&p_y_pos[i]);
@@ -161,6 +161,7 @@ void integrate_motions(const uint32_t particle_count,
         wasm_v128_store(&p_z_pos[i], pz);
     }
 
+    // Handle remaining values that did not fit into the SIMD lanes
     for (; i < particle_count; i++) {
         p_x_vel[i] += p_x_accel[i] * dt;
         p_y_vel[i] += p_y_accel[i] * dt;

@@ -38,7 +38,7 @@ export default class ParticleSystemBuffer {
     attractorObjects: Attractor[]
 
     // Misc. stuff
-    timeSep: number = 0.1
+    timeStep: number = 0.1
     integrationStepCount: number = 1
 
     constructor(system: ParticleSystem, particleCount: number, mathModule: PMM) {
@@ -86,7 +86,7 @@ export default class ParticleSystemBuffer {
         this.math.integrateParticleMotion(
             this.integrationStepCount,
             this.particleCount,
-            this.timeSep,
+            this.timeStep,
             this.particlePositions.xArrayAddr(),            // \
             this.particlePositions.yArrayAddr(),            // | Particle Positions
             this.particlePositions.zArrayAddr(),            // /

@@ -19,6 +19,7 @@ export function showToast(message: string) {
 
 export function showDetailedToast(title: string, message: string) {
     toast(title, {
+        dismissible: true,
         position: 'top-right',
         description: message
     })

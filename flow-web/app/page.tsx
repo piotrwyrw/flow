@@ -30,7 +30,7 @@ export default function Page() {
         loader.loadMissingModules().then(() => {
             setWasmLoader(loader)
 
-            const pipe = new RenderPipeline(rendererRef.current!, 200000, loader)
+            const pipe = new RenderPipeline(rendererRef.current!, 100000, loader)
             const processor = new CommandProcessor(pipe.particleSystem)
 
             setPipeline(pipe)
@@ -41,19 +41,36 @@ export default function Page() {
 
     return (
         <>
-            <div className="w-full h-svh z-10 pointer-events-auto">
-                <div ref={rendererRef} className="w-full h-full"></div>
+            <>
+                <div className="w-full h-svh z-10 pointer-events-auto">
+                    <div ref={rendererRef} className="w-full h-full"></div>
+                </div>
+
+                {
+                    particleSystem
+                    && <ControlOverlay system={particleSystem}></ControlOverlay>
+                }
+
+                {
+                    commandProcessor
+                    && <CommandPrompt processor={commandProcessor}></CommandPrompt>
+                }
+            </>
+            {/* Some SEO B.S. */}
+            <div className="seo">
+                <h1>The Flow Particle Simulator</h1>
+                <p>A real-time Three.js particle simulator demonstrating motion, and interactive physics.</p>
+
+                <h2>Features</h2>
+                <ul>
+                    <li>Real-time particle rendering</li>
+                    <li>Configurable simulation math</li>
+                    <li>GPU-accelerated shading</li>
+                </ul>
+
+                <h2>What it demonstrates</h2>
+                <p>This project simulates basic physical systems using vector motion and simple isotropic forces.</p>
             </div>
-
-            {
-                particleSystem
-                && <ControlOverlay system={particleSystem}></ControlOverlay>
-            }
-
-            {
-                commandProcessor
-                && <CommandPrompt processor={commandProcessor}></CommandPrompt>
-            }
         </>
     )
 }

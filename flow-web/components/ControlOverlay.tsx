@@ -4,7 +4,7 @@
  */
 
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {IconHome, IconPlus} from "@tabler/icons-react";
+import {IconBoltFilled, IconChartBar, IconCode, IconHome, IconLambda, IconPlus} from "@tabler/icons-react";
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
 import Attractor, {AttractorMode} from "@/lib/simulation/Attractor";
 import {Button} from "@/components/ui/button";
@@ -23,6 +23,10 @@ import {
 } from "@/lib/DynamicForms";
 import DynamicForm from "@/components/DynamicForm";
 import AttractorListing from "@/components/AttractorListing";
+import {ScriptListing} from "@/components/ScriptListing";
+import {Input} from "@/components/ui/input";
+import {PlusIcon} from "lucide-react";
+import SimulationScript from "@/lib/scripting/SimulationScript";
 
 type ControlOverlayProps = {
     system: ParticleSystem
@@ -50,7 +54,7 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
     }, [system])
 
     useEffect(() => {
-        system.setTimeStep(integrationTimeStep[0] || initialIntegrationTimeStep)
+        system.setTimeStep(integrationTimeStep[0] ?? initialIntegrationTimeStep)
     }, [integrationTimeStep]);
 
     useEffect(() => {
@@ -83,6 +87,34 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
         ))
     }
 
+    // Script creation
+    const [scriptName, setScriptName] = useState<string>("")
+    const [scriptNameValid, setScriptNameValid] = useState<boolean>(false)
+
+    useEffect(() => {
+        if (scriptName.trim().length === 0) {
+            setScriptNameValid(false)
+            return;
+        }
+
+        const conflictingScript = system.scriptManager.getScripts().find(script => script.name.trim() === scriptName.trim())
+        if (!conflictingScript) {
+            setScriptNameValid(true)
+            return;
+        }
+
+        setScriptNameValid(false);
+    }, [scriptName])
+
+    const [scripts, setScripts] = useState<readonly SimulationScript[]>([])
+
+    function createScript() {
+        if (!scriptNameValid) return;
+
+        system.scriptManager.addScript(scriptName, "", () => {}, () => {})
+        setScripts(system.scriptManager.getScripts())
+    }
+
     const removeAttractor = (index: number) => {
         // TODO system.removeAttractor(index)
     }
@@ -92,9 +124,22 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
             <Tabs defaultValue="home" className="px-10 py-5 pointer-events-none">
                 <TabsList className="pointer-events-auto">
                     <TabsTrigger value="home"><IconHome/></TabsTrigger>
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="attr">Attractors</TabsTrigger>
-                    <TabsTrigger value="sim">Simulation Math</TabsTrigger>
+                    <TabsTrigger value="overview">
+                        <IconChartBar/>
+                        Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="attr">
+                        <IconBoltFilled/>
+                        Attractors
+                    </TabsTrigger>
+                    <TabsTrigger value="sim">
+                        <IconLambda/>
+                        Simulation Math
+                    </TabsTrigger>
+                    <TabsTrigger value="scripting">
+                        <IconCode/>
+                        Scripting
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="home"></TabsContent>
                 <TabsContent value="overview">
@@ -150,7 +195,7 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
                     <Card className="w-100">
                         <CardHeader>
                             <CardTitle>Simulation</CardTitle>
-                            <CardDescription>Tune Simulation Parameters</CardDescription>
+                            <CardDescription>Tune simulation parameters</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Card className="w-full">
@@ -205,6 +250,49 @@ export default function ControlOverlay({system}: ControlOverlayProps) {
                                 </CardHeader>
                             </Card>
                         </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="scripting">
+                    <Card className="w-100">
+                        <CardHeader>
+                            <CardTitle>Scripting</CardTitle>
+                            <CardDescription>Control the simulation through scripting</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScriptListing system={system} scripts={scripts}></ScriptListing>
+                        </CardContent>
+                        <CardFooter>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button className="w-full" variant="outline" size="sm">
+                                        <IconPlus/> New Script
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80">
+                                    <div className="grid gap-4">
+                                        <div className="space-y-2">
+                                            <h4 className="leading-none font-medium">New Attractor</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                Create a new particle attractor
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-3 items-center">
+                                            <Label htmlFor="name">Name</Label>
+                                            <Input id="name"
+                                                   type="text"
+                                                   value={scriptName}
+                                                   onChange={e => setScriptName(e.target.value)}
+                                                   className="w-full col-span-2 h-8">
+                                            </Input>
+                                        </div>
+                                        <Button disabled={!scriptNameValid} onClick={createScript}>
+                                            <PlusIcon/>
+                                            Create
+                                        </Button>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </CardFooter>
                     </Card>
                 </TabsContent>
             </Tabs>

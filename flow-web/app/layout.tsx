@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 /*
  * Copyright (c) 2026 Piotr Krzysztof Wyrwas [flow]
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -5,6 +6,7 @@
 
 import {Figtree, Geist_Mono} from "next/font/google"
 
+//@ts-ignore
 import "./globals.css"
 import {cn} from "@/lib/utils";
 import {Toaster} from "@/components/ui/sonner";
@@ -16,6 +18,11 @@ const fontMono = Geist_Mono({
     subsets: ["latin"],
     variable: "--font-mono",
 })
+
+export const metadata: Metadata = {
+    title: "Flow",
+    description: "Interactive particle simulator built with Three.js."
+}
 
 export default function RootLayout({children}: Readonly<{ children: React.ReactNode }>) {
     return (<html lang="en" suppressHydrationWarning
